@@ -10,11 +10,12 @@ public interface UserService {
     boolean isAdmin(UUID userId);
     ApiResponse registerUser(RegisterDTO registerDTO);
     AuthResponseDTO loginUser(String email, String password);
-    List<UserDTO> getAllUsers();
+    List<UserDTO> getAllUsers(UserStatus status, String role);
+    List<UserDTO> getPendingUsers(UserStatus status);
     boolean isUserApproved(UUID userId);
     UserDTO getUserById(UUID userId);
     UserDTO updateUser(UUID userId, UserUpdateDTO updateDTO);
     UserDTO updateUserStatus(UUID userId, UserStatus status);
     UserDTO updateUserRole(UUID userId, String role);
-    UserDTO updateProfilePicture(UUID userId, Long resourceId);
+    UserDTO updateProfilePicture(UUID userId, UUID resourceId);
 }

@@ -9,10 +9,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface ResourceRepository extends JpaRepository<Resource, Long> {
+public interface ResourceRepository extends JpaRepository<Resource, UUID> {
     List<Resource> findByUserIdAndDeletedAtIsNull(UUID userId);
-    Optional<Resource> findByIdAndUserIdAndDeletedAtIsNull(Long id, UUID userId);
-    Optional<Resource> findByObjectKeyAndDeletedAtIsNull(String objectKey);
-
+    Optional<Resource> findByIdAndUserIdAndDeletedAtIsNull(UUID id, UUID userId);
+    Optional<Resource> findByIdAndDeletedAtIsNull(UUID id);
     List<Resource> findByUserIdAndTitleContaining(UUID userId, String profilePicture);
+    List<Resource> findByVisibilityAndDeletedAtIsNull(String visibility);
+
+    List<Resource> findByDeletedAtIsNull();
 }

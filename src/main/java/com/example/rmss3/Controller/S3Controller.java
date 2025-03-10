@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.AccessDeniedException;
 import java.util.UUID;
 
 @RestController
@@ -31,6 +32,7 @@ public class S3Controller {
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Resource>> uploadFile(
             @RequestParam("file") MultipartFile file,
+            @RequestParam("visibility") String visibility,
             @RequestHeader("Authorization") String token) {
 
         UUID userId = extractUserIdFromToken(token);
@@ -43,7 +45,7 @@ public class S3Controller {
         }
 
         try {
-            Resource resource = s3Service.uploadFile(file, userId);
+            Resource resource = s3Service.uploadFile(file, userId, null, visibility);
             return ResponseEntity
                     .status(HttpStatus.CREATED)
                     .body(new ApiResponse<>(HttpStatus.CREATED.value(), "File uploaded successfully", resource));
@@ -56,20 +58,22 @@ public class S3Controller {
 
     @GetMapping("/{resourceId}")
     public ResponseEntity<byte[]> getFile(
-            @PathVariable Long resourceId,
-            @RequestHeader("Authorization") String token) {
+            @PathVariable UUID resourceId,
+            @RequestHeader("Authorization") String token) throws AccessDeniedException {
 
         UUID userId = extractUserIdFromToken(token);
 
-        // Verify user is approved
+        String userRole = jwtService.extractRole(token.substring(7));
+
+
         if (!userService.isUserApproved(userId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        return s3Service.getFile(resourceId, userId);
+        return s3Service.getFile(resourceId, userId, userRole);
     }
 
-    // Helper method to safely extract user ID from token
+
     private UUID extractUserIdFromToken(String token) {
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
@@ -85,7 +89,7 @@ public class S3Controller {
 
         UUID userId = extractUserIdFromToken(token);
 
-        // Verify user is approved
+
         if (!userService.isUserApproved(userId)) {
             return ResponseEntity
                     .status(HttpStatus.FORBIDDEN)
@@ -93,7 +97,7 @@ public class S3Controller {
         }
 
         try {
-            // Validate file is an image
+
             if (!file.getContentType().startsWith("image/")) {
                 return ResponseEntity
                         .status(HttpStatus.BAD_REQUEST)
@@ -101,10 +105,10 @@ public class S3Controller {
                                 "Only image files are allowed for profile pictures", null));
             }
 
-            // Upload file and get resource
+
             Resource resource = s3Service.uploadFile(file, userId);
 
-            // Update user profile with the resource ID
+
             UserDTO updatedUser = userService.updateProfilePicture(userId, resource.getId());
 
             return ResponseEntity
