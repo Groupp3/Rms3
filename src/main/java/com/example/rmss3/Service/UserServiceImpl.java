@@ -99,6 +99,36 @@ public class UserServiceImpl implements UserService {
         return new AuthResponseDTO(token, convertToDTO(user, profileImageUrl));
     }
 
+
+    @Override
+    public UserDTO softDeleteUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+        // Set the deleted timestamp
+        user.setDeletedAt(LocalDateTime.now());
+
+        // Optionally update the status to indicate deletion
+        user.setStatus(UserStatus.REJECTED);
+
+        // Set the modification timestamp
+        user.setModifiedAt(LocalDateTime.now());
+
+        // Save the updated user
+        User deletedUser = userRepository.save(user);
+
+        // Get profile image URL if exists
+        Optional<Resource> profilePic = resourceRepository.findByUserIdAndDeletedAtIsNull(userId)
+                .stream()
+                .findFirst();
+        String profileImageUrl = profilePic.map(resource -> s3Service.getFileUrl(resource.getId())).orElse(null);
+
+        // Convert to DTO and return
+        return convertToDTO(deletedUser, profileImageUrl);
+    }
+
+
+
     @Override
     public List<UserDTO> getAllUsers(UserStatus status, String role) {
         List<User> users = userRepository.findByStatusAndRole_RoleAndDeletedAtIsNull(UserStatus.APPROVED,role);
@@ -184,6 +214,7 @@ public class UserServiceImpl implements UserService {
 
         user.setStatus(status);
         user.setModifiedAt(LocalDateTime.now());
+        user.setDeletedAt(LocalDateTime.now());
         User updatedUser = userRepository.save(user);
 
         Optional<Resource> profilePic = resourceRepository.findByUserIdAndDeletedAtIsNull(userId)

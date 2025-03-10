@@ -86,7 +86,15 @@ public class UserController {
         UserDTO updatedUser = userService.updateUserRole(userId, role);
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "User role updated successfully", updatedUser));
     }
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping("/admin/users/{userId}")
+    public ResponseEntity<ApiResponse<UserDTO>> softDeleteUser(
+            @PathVariable UUID userId) {
 
+        UserDTO deletedUser = userService.softDeleteUser(userId);
+        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(),
+                "User deleted successfully", deletedUser));
+    }
     // User endpoints
     @GetMapping("/users/profile")
     public ResponseEntity<ApiResponse<UserDTO>> getUserProfile(@RequestHeader("Authorization") String token) {
