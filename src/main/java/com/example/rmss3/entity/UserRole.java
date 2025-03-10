@@ -22,7 +22,37 @@ public class UserRole {
     @Column(updatable = false, nullable = false)
     private UUID role_id;
 
+    public UUID getRole_id() {
+        return role_id;
+    }
 
+    public void setRole_id(UUID role_id) {
+        this.role_id = role_id;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
 
     @Column(unique = true, nullable = false)
     private String role;
