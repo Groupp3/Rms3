@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -99,8 +100,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserDTO> getAllUsers() {
-        List<User> users = userRepository.findAll();
+    public List<UserDTO> getAllUsers(UserStatus status, String role) {
+        List<User> users = userRepository.findByStatusAndRole_RoleAndDeletedAtIsNull(UserStatus.APPROVED,role);
         return users.stream()
                 .map(user -> {
                     Optional<Resource> profilePic = resourceRepository.findByUserIdAndDeletedAtIsNull(user.getId())
@@ -110,6 +111,19 @@ public class UserServiceImpl implements UserService {
                     return convertToDTO(user, profileImageUrl);
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserDTO> getPendingUsers(UserStatus status){
+
+        if (status != UserStatus.PENDING){
+            return Collections.emptyList();
+        }
+        List<User> pendingUsers = userRepository.findByStatusAndDeletedAtIsNull(UserStatus.PENDING);
+        return pendingUsers.stream()
+                .map(user -> convertToDTO(user,null))
+                .collect(Collectors.toList());
+
     }
 
     @Override
@@ -143,6 +157,10 @@ public class UserServiceImpl implements UserService {
 
         if (updateDTO.getLastName() != null) {
             user.setLastName(updateDTO.getLastName());
+        }
+
+        if (updateDTO.getEmail() != null) {
+            user.setLastName(updateDTO.getEmail());
         }
 
         // Only update password if provided
@@ -197,19 +215,19 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserDTO updateProfilePicture(UUID userId, Long resourceId) {
-        // Verify user exists
+    public UserDTO updateProfilePicture(UUID userId, UUID resourceId) {
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Make sure the resource exists
+
         Resource profilePicResource = resourceRepository.findById(resourceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
 
-        // Generate URL for the profile picture
+
         String imageUrl = s3Service.getFileUrl(resourceId);
 
-        // Convert user to DTO with the profile image URL
+
         return convertToDTO(user, imageUrl);
     }
 

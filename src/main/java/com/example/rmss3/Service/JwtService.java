@@ -16,7 +16,7 @@ public class JwtService {
 
     public String generateToken(User user) {
         return Jwts.builder()
-                .setSubject(user.getEmail()) // Use email as subject for UserDetailsService
+                .setSubject(user.getEmail())
                 .claim("userId", user.getId().toString())
                 .claim("role", user.getRole().getRole())
                 .setIssuedAt(new Date())

@@ -5,6 +5,7 @@ import com.example.rmss3.Service.S3Service;
 import com.example.rmss3.Service.UserService;
 import com.example.rmss3.dto.*;
 import com.example.rmss3.entity.Resource;
+import com.example.rmss3.entity.UserRole;
 import com.example.rmss3.entity.UserStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -54,8 +55,15 @@ public class UserController {
     // Admin endpoints
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @GetMapping("/admin/users")
-    public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers() {
-        List<UserDTO> users = userService.getAllUsers();
+    public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers(@RequestParam String role) {
+        List<UserDTO> users = userService.getAllUsers(UserStatus.APPROVED, role);
+        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Users retrieved successfully", users));
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @GetMapping("/admin/request")
+    public ResponseEntity<ApiResponse<List<UserDTO>>> getPendingUsers() {
+        List<UserDTO> users = userService.getPendingUsers(UserStatus.PENDING);
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Users retrieved successfully", users));
     }
 
