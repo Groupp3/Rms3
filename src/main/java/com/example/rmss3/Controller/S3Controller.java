@@ -1,49 +1,125 @@
 package com.example.rmss3.Controller;
 
-
+import com.example.rmss3.Service.JwtService;
+import com.example.rmss3.dto.ApiResponse;
+import com.example.rmss3.dto.UserDTO;
+import com.example.rmss3.entity.Resource;
 import com.example.rmss3.Service.S3Service;
-import org.springframework.http.HttpHeaders;
+import com.example.rmss3.Service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
+import java.nio.file.AccessDeniedException;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/s3")
+@RequestMapping("/api/files")
 public class S3Controller {
 
-    private final S3Service s3Service;
+    @Autowired
+    private S3Service s3Service;
 
-    public S3Controller(S3Service s3Service) {
-        this.s3Service = s3Service;
-    }
+    @Autowired
+    private UserService userService;
 
-    @PostMapping("/upload")
-    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+    @Autowired
+    private JwtService jwtService;
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Resource>> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("visibility") String visibility,
+            @RequestHeader("Authorization") String token) {
+
+        UUID userId = extractUserIdFromToken(token);
+
+        // Verify user is approved
+        if (!userService.isUserApproved(userId)) {
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+        }
+
         try {
-            String fileName = s3Service.uploadFile(file);
-            return ResponseEntity.ok("File uploaded: " + fileName);
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading file: " + e.getMessage());
+            Resource resource = s3Service.uploadFile(file, userId, null, visibility);
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(new ApiResponse<>(HttpStatus.CREATED.value(), "File uploaded successfully", resource));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
         }
     }
 
-    @GetMapping("/download/{fileName}")
-    public ResponseEntity<byte[]> downloadFile(@PathVariable String fileName) {
-        byte[] fileBytes = s3Service.downloadFile(fileName);
+    @GetMapping("/{resourceId}")
+    public ResponseEntity<byte[]> getFile(
+            @PathVariable UUID resourceId,
+            @RequestHeader("Authorization") String token) throws AccessDeniedException {
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
-                .body(fileBytes);
+        UUID userId = extractUserIdFromToken(token);
+
+        String userRole = jwtService.extractRole(token.substring(7));
+
+
+        if (!userService.isUserApproved(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        return s3Service.getFile(resourceId, userId, userRole);
     }
 
-    @DeleteMapping("/delete/{fileName}")
-    public ResponseEntity<String> deleteFile(@PathVariable String fileName) {
-        s3Service.deleteFile(fileName);
-        return ResponseEntity.ok("File deleted: " + fileName);
+
+    private UUID extractUserIdFromToken(String token) {
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        return jwtService.extractUserId(token);
+    }
+
+
+
+
+    @PostMapping(value = "/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<UserDTO>> uploadProfilePicture(
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader("Authorization") String token) {
+
+        UUID userId = extractUserIdFromToken(token);
+
+
+        if (!userService.isUserApproved(userId)) {
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+        }
+
+        try {
+
+            if (!file.getContentType().startsWith("image/")) {
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(),
+                                "Only image files are allowed for profile pictures", null));
+            }
+
+
+            Resource resource = s3Service.uploadFile(file, userId);
+
+
+            UserDTO updatedUser = userService.updateProfilePicture(userId, resource.getId());
+
+            return ResponseEntity
+                    .status(HttpStatus.OK)
+                    .body(new ApiResponse<>(HttpStatus.OK.value(), "Profile picture updated successfully", updatedUser));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
+        }
     }
 }
-
-
