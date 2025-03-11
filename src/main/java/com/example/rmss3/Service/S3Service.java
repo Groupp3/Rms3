@@ -23,8 +23,11 @@ import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class S3Service {
@@ -41,28 +44,36 @@ public class S3Service {
     @Value("${aws.s3.bucket}")
     private String bucketName;
 
-    public Resource uploadFile(MultipartFile file, UUID userId) throws IOException {
-        return uploadFile(file, userId, null);
-    }
 
-    public Resource uploadFile(MultipartFile file, UUID userId, String title) throws IOException {
-        return uploadFile(file, userId, title, "public");
-    }
-
-
-
-    public Resource uploadFile(MultipartFile file, UUID userId, String title, String visibility) throws IOException {
+    public Resource uploadFile(MultipartFile file, UUID userId, String title, String visibility, boolean isProfilePicture) throws IOException {
         String fileName = generateFileName(file);
-        String objectKey = userId + "/" + fileName;
+        String objectKey;
+
+
+        String extension = getFileExtension(file.getOriginalFilename());
+
+
+        if (isProfilePicture) {
+            objectKey = "profile-pictures/" + userId + "/" + fileName;
+        }
+
+        else if (isImageFile(extension) && title != null && title.startsWith("learning-material")) {
+            objectKey = "certificates/" + fileName;
+        }
+
+        else {
+            objectKey = extension + "/" + fileName;
+        }
 
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentType(file.getContentType());
         metadata.setContentLength(file.getSize());
 
-        // Upload file to S3
+
+        metadata.addUserMetadata("userId", userId.toString());
+
         s3Client.putObject(bucketName, objectKey, file.getInputStream(), metadata);
 
-        // Create and save resource record
         Resource resource = new Resource();
         resource.setFileSize(file.getSize());
         resource.setVisibility(visibility != null ? visibility.toLowerCase() : "public");
@@ -77,16 +88,56 @@ public class S3Service {
         return resourceRepository.save(resource);
     }
 
+
+    public Resource uploadFile(MultipartFile file, UUID userId, String title, String visibility) throws IOException {
+
+        return uploadFile(file, userId, title, visibility, false);
+    }
+
+
+    private boolean isImageFile(String extension) {
+        if (extension == null || extension.isEmpty()) {
+            return false;
+        }
+
+        List<String> imageExtensions = Arrays.asList("jpg", "jpeg", "png", "gif", "bmp", "webp", "svg");
+        return imageExtensions.contains(extension.toLowerCase());
+    }
+
+
+    private String getFileExtension(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return "unknown";
+        }
+
+        int lastDotIndex = filename.lastIndexOf('.');
+        if (lastDotIndex > 0 && lastDotIndex < filename.length() - 1) {
+            return filename.substring(lastDotIndex + 1).toLowerCase();
+        } else {
+            return "unknown";
+        }
+    }
+
+
     public Resource uploadProfilePicture(MultipartFile file, UUID userId) throws IOException {
-        // Mark existing profile pictures as deleted
         List<Resource> existingProfilePics = resourceRepository.findByUserIdAndTitleContaining(userId, "Profile Picture");
         for (Resource oldPic : existingProfilePics) {
             oldPic.setDeletedAt(LocalDateTime.now());
             resourceRepository.save(oldPic);
         }
 
+        return uploadFile(file, userId, "Profile Picture", "public", true);
+    }
 
-        return uploadFile(file, userId, "Profile Picture");
+    public Resource uploadLearningMaterial(MultipartFile file, UUID userId, String userRole,
+                                           String visibility) throws IOException {
+        if (!isResourceTypeAllowed(file.getContentType(), userRole)) {
+            throw new AccessDeniedException("You don't have permission to upload this file type");
+        }
+
+
+        String title = "learning-material-" + file.getOriginalFilename();
+        return uploadFile(file, userId, title, visibility, false);
     }
 
     public ResponseEntity<byte[]> getFile(UUID resourceId, UUID userId, String userRole) throws AccessDeniedException {
@@ -143,10 +194,7 @@ public class S3Service {
 
         return resourceAccessRepository.findByResourceIdAndUserIdAndDeletedAtIsNull(
                 resource.getId(),userId).isPresent();
-
-
     }
-
 
     public void grantAccess(UUID resourceId, UUID granteeId, UUID grantorId,String grantorRole) throws AccessDeniedException {
         Resource resource= resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
@@ -164,11 +212,9 @@ public class S3Service {
         resourceAccessRepository.save(access);
     }
 
-
     public void revokeAccess(UUID resourceId, UUID userId, UUID revokerUserId, String revokerRole) throws AccessDeniedException {
         Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
-
 
         if (!resource.getUserId().equals(revokerUserId) && !"ADMIN".equals(revokerRole)) {
             throw new AccessDeniedException("You don't have permission to revoke access");
@@ -182,20 +228,16 @@ public class S3Service {
         resourceAccessRepository.save(access);
     }
 
-
     public List<Resource> findAccessibleResources(UUID userId, String userRole) {
         List<Resource> resources = new ArrayList<>();
 
-
         resources.addAll(resourceRepository.findByVisibilityAndDeletedAtIsNull("public"));
-
 
         if ("ADMIN".equals(userRole)) {
             return resourceRepository.findByDeletedAtIsNull();
         }
 
         resources.addAll(resourceRepository.findByUserIdAndDeletedAtIsNull(userId));
-
 
         List<ResourceAccess> accessList = resourceAccessRepository
                 .findByUserIdAndDeletedAtIsNull(userId);
@@ -208,30 +250,59 @@ public class S3Service {
         return resources;
     }
 
-
     public boolean isResourceTypeAllowed(String contentType, String userRole) {
         boolean isPDF = contentType.equals("application/pdf");
         boolean isVideo = contentType.startsWith("video/");
         boolean isCertificate = contentType.startsWith("image/");
 
         if ("STUDENT".equals(userRole)) {
-
             return isCertificate;
         }
-
 
         return true;
     }
 
+    public List<Resource> findResourcesByRole(UUID userId, String role, String contentType) {
 
-    public Resource uploadLearningMaterial(MultipartFile file, UUID userId, String userRole,
-                                           String visibility) throws IOException {
-        if (!isResourceTypeAllowed(file.getContentType(), userRole)) {
-            throw new AccessDeniedException("You don't have permission to upload this file type");
+
+        if ("ADMIN".equals(role)) {
+            if (contentType != null && !contentType.isEmpty()) {
+                return resourceRepository.findAllByContentTypeAndDeletedAtIsNull(contentType);
+            } else {
+                return resourceRepository.findByDeletedAtIsNull();
+            }
+        } else if ("MENTOR".equals(role) || "STUDENT".equals(role)) {
+            List<Resource> resources = new ArrayList<>();
+
+
+            if (contentType != null && !contentType.isEmpty()) {
+                resources.addAll(resourceRepository.findByVisibilityAndContentTypeAndDeletedAtIsNull("public", contentType));
+            } else {
+                resources.addAll(resourceRepository.findByVisibilityAndDeletedAtIsNull("public"));
+            }
+
+
+            if (contentType != null && !contentType.isEmpty()) {
+                resources.addAll(resourceRepository.findByUserIdAndContentTypeAndDeletedAtIsNull(userId, contentType));
+            } else {
+                resources.addAll(resourceRepository.findByUserIdAndDeletedAtIsNull(userId));
+            }
+
+
+            List<ResourceAccess> accessList = resourceAccessRepository.findByUserIdAndDeletedAtIsNull(userId);
+            for (ResourceAccess access : accessList) {
+                if (contentType != null && !contentType.isEmpty()) {
+                    resourceRepository.findByIdAndContentTypeAndDeletedAtIsNull(access.getResourceId(), contentType)
+                            .ifPresent(resources::add);
+                } else {
+                    resourceRepository.findByIdAndDeletedAtIsNull(access.getResourceId())
+                            .ifPresent(resources::add);
+                }
+            }
+
+            return resources.stream().distinct().collect(Collectors.toList());
+        } else {
+            return Collections.emptyList();
         }
-
-        return uploadFile(file, userId, null, visibility); // Pass the visibility parameter
     }
-
-
 }

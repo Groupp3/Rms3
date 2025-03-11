@@ -69,7 +69,7 @@ public class ResourceController {
             UUID userId = extractUserIdFromToken(token);
             String userRole = jwtService.extractRole(token.substring(7));
 
-            // Verify user is approved
+
             if (!userService.isUserApproved(userId)) {
                 return ResponseEntity
                         .status(HttpStatus.FORBIDDEN)
@@ -120,11 +120,13 @@ public class ResourceController {
 
     @GetMapping("/list")
     public ResponseEntity<ApiResponse<List<Resource>>> listAccessibleResources(
-            @RequestHeader("Authorization") String token) {
+            @RequestParam(required = false) String contentType,
+            @RequestHeader("Authorization") String token)
+    {
 
         try {
             UUID userId = extractUserIdFromToken(token);
-            String userRole = jwtService.extractRole(token.substring(7));
+            String userRole = extractRoleFromToken(token.substring(7));
 
 
             if (!userService.isUserApproved(userId)) {
@@ -133,7 +135,8 @@ public class ResourceController {
                         .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
             }
 
-            List<Resource> resources = s3Service.findAccessibleResources(userId, userRole);
+
+            List<Resource> resources = s3Service.findResourcesByRole(userId, userRole, contentType);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resources retrieved successfully", resources));
         } catch (Exception e) {
             return ResponseEntity

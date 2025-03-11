@@ -41,13 +41,7 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private JwtService jwtService;
 
-    @Override
-    public boolean isAdmin(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        return user.getRole() != null && user.getRole().getRole().equals("ADMIN");
-    }
 
     @Override
     public ApiResponse registerUser(RegisterDTO registerDTO) {
