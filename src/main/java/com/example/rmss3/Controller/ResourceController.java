@@ -160,6 +160,37 @@ public class ResourceController {
         }
     }
 
+    @DeleteMapping("/{resourceId}")
+    public ResponseEntity<ApiResponse<Resource>> softDeleteResource(
+            @PathVariable UUID resourceId,
+            @RequestHeader("Authorization") String token) {
+
+        UUID userId = extractUserIdFromToken(token);
+        String userRole = jwtService.extractRole(token.substring(7));
+
+        // Verify user is approved
+        if (!userService.isUserApproved(userId)) {
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+        }
+
+        try {
+            Resource deletedResource = s3Service.softDeleteResource(resourceId, userId, userRole);
+            return ResponseEntity
+                    .status(HttpStatus.OK)
+                    .body(new ApiResponse<>(HttpStatus.OK.value(), "Resource deleted successfully", deletedResource));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
+        }
+    }
+
 
     @PostMapping("/{resourceId}/revoke")
     public ResponseEntity<ApiResponse<Void>> revokeAccess(

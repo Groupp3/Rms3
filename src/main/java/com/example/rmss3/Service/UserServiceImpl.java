@@ -51,6 +51,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ApiResponse registerUser(RegisterDTO registerDTO) {
+        // Password validation regex (e.g., minimum 8 characters, at least one number, one uppercase letter, and one special character)
+        String passwordRegex = "^(?=.*[0-9])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\\S+$).{8,}$";
+
+        // Check if password meets criteria
+        if (!registerDTO.getPassword().matches(passwordRegex)) {
+            throw new RuntimeException("Password must be at least 8 characters long, contain one uppercase letter, one number, and one special character.");
+        }
+
         if (userRepository.findByEmail(registerDTO.getEmail()).isPresent()) {
             throw new RuntimeException("Email already registered");
         }
@@ -62,7 +70,7 @@ public class UserServiceImpl implements UserService {
         user.setFirstName(registerDTO.getFirstName());
         user.setLastName(registerDTO.getLastName());
         user.setEmail(registerDTO.getEmail());
-        user.setPassword(passwordEncoder.encode(registerDTO.getPassword()));
+        user.setPassword(passwordEncoder.encode(registerDTO.getPassword()));  // Encode password after validation
         user.setStatus(UserStatus.PENDING);
         user.setRole(studentRole);
 
@@ -192,7 +200,9 @@ public class UserServiceImpl implements UserService {
         if (updateDTO.getEmail() != null) {
             user.setLastName(updateDTO.getEmail());
         }
-
+        if (updateDTO.getPassword() != null && !updateDTO.getPassword().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(updateDTO.getPassword()));
+        }
         // Only update password if provided
 
 
