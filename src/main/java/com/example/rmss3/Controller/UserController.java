@@ -7,7 +7,6 @@ import com.example.rmss3.dto.*;
 import com.example.rmss3.entity.Resource;
 import com.example.rmss3.entity.UserRole;
 import com.example.rmss3.entity.UserStatus;
-import com.example.rmss3.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,9 +33,6 @@ public class UserController {
     @Autowired
     private S3Service s3Service;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
     // Public endpoints
     @PostMapping("/auth/register")
     public ResponseEntity registerUser(@Valid @RequestBody RegisterDTO registerDTO) {
@@ -55,31 +51,6 @@ public class UserController {
                     .body(new ApiResponse<>(HttpStatus.UNAUTHORIZED.value(), e.getMessage(), null));
         }
     }
-
-    @PostMapping("/auth/logout")
-    public ResponseEntity<ApiResponse<String>> logoutUser(@RequestHeader("Authorization") String token) {
-        try {
-            // Verify token exists and has correct format
-            if (token != null && token.startsWith("Bearer ")) {
-                String jwtToken = token.substring(7);
-
-                // Invalidate the token
-                jwtUtil.invalidateToken(jwtToken);
-
-                return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Logout successful", null));
-            } else {
-                return ResponseEntity
-                        .status(HttpStatus.BAD_REQUEST)
-                        .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Invalid token format", null));
-            }
-        } catch (Exception e) {
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Logout failed: " + e.getMessage(), null));
-        }
-    }
-
-
 
     // Admin endpoints
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
@@ -115,15 +86,7 @@ public class UserController {
         UserDTO updatedUser = userService.updateUserRole(userId, role);
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "User role updated successfully", updatedUser));
     }
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @DeleteMapping("/admin/users/{userId}")
-    public ResponseEntity<ApiResponse<UserDTO>> softDeleteUser(
-            @PathVariable UUID userId) {
 
-        UserDTO deletedUser = userService.softDeleteUser(userId);
-        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(),
-                "User deleted successfully", deletedUser));
-    }
     // User endpoints
     @GetMapping("/users/profile")
     public ResponseEntity<ApiResponse<UserDTO>> getUserProfile(@RequestHeader("Authorization") String token) {
@@ -141,7 +104,6 @@ public class UserController {
         UserDTO updatedUser = userService.updateUser(userId, updateDTO);
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Profile updated successfully", updatedUser));
     }
-
 
     @PostMapping(value = "/users/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<UserDTO>> uploadProfilePicture(

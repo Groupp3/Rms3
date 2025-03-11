@@ -51,14 +51,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ApiResponse registerUser(RegisterDTO registerDTO) {
-        // Password validation regex (e.g., minimum 8 characters, at least one number, one uppercase letter, and one special character)
-        String passwordRegex = "^(?=.*[0-9])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\\S+$).{8,}$";
-
-        // Check if password meets criteria
-        if (!registerDTO.getPassword().matches(passwordRegex)) {
-            throw new RuntimeException("Password must be at least 8 characters long, contain one uppercase letter, one number, and one special character.");
-        }
-
         if (userRepository.findByEmail(registerDTO.getEmail()).isPresent()) {
             throw new RuntimeException("Email already registered");
         }
@@ -70,7 +62,6 @@ public class UserServiceImpl implements UserService {
         user.setFirstName(registerDTO.getFirstName());
         user.setLastName(registerDTO.getLastName());
         user.setEmail(registerDTO.getEmail());
-        user.setPassword(passwordEncoder.encode(registerDTO.getPassword()));  // Encode password after validation
         user.setStatus(UserStatus.PENDING);
         user.setRole(studentRole);
 
@@ -106,36 +97,6 @@ public class UserServiceImpl implements UserService {
 
         return new AuthResponseDTO(token, convertToDTO(user, profileImageUrl));
     }
-
-
-    @Override
-    public UserDTO softDeleteUser(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
-
-        // Set the deleted timestamp
-        user.setDeletedAt(LocalDateTime.now());
-
-        // Optionally update the status to indicate deletion
-        user.setStatus(UserStatus.REJECTED);
-
-        // Set the modification timestamp
-        user.setModifiedAt(LocalDateTime.now());
-
-        // Save the updated user
-        User deletedUser = userRepository.save(user);
-
-        // Get profile image URL if exists
-        Optional<Resource> profilePic = resourceRepository.findByUserIdAndDeletedAtIsNull(userId)
-                .stream()
-                .findFirst();
-        String profileImageUrl = profilePic.map(resource -> s3Service.getFileUrl(resource.getId())).orElse(null);
-
-        // Convert to DTO and return
-        return convertToDTO(deletedUser, profileImageUrl);
-    }
-
-
 
     @Override
     public List<UserDTO> getAllUsers(UserStatus status, String role) {
@@ -200,9 +161,6 @@ public class UserServiceImpl implements UserService {
         if (updateDTO.getEmail() != null) {
             user.setLastName(updateDTO.getEmail());
         }
-        if (updateDTO.getPassword() != null && !updateDTO.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(updateDTO.getPassword()));
-        }
         // Only update password if provided
 
 
@@ -224,7 +182,6 @@ public class UserServiceImpl implements UserService {
 
         user.setStatus(status);
         user.setModifiedAt(LocalDateTime.now());
-        user.setDeletedAt(LocalDateTime.now());
         User updatedUser = userRepository.save(user);
 
         Optional<Resource> profilePic = resourceRepository.findByUserIdAndDeletedAtIsNull(userId)
