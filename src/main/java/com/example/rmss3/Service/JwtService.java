@@ -20,7 +20,7 @@ public class JwtService {
                 .claim("userId", user.getId().toString())
                 .claim("role", user.getRole().getRole())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24)) // 24 hours
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
                 .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
                 .compact();
     }
