@@ -77,6 +77,23 @@ public class S3Service {
         return resourceRepository.save(resource);
     }
 
+    public Resource softDeleteResource(UUID resourceId, UUID userId, String userRole) throws AccessDeniedException {
+        Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+
+        // Check if user has permission to delete this resource
+        if(!resource.getUserId().equals(userId) && !"ADMIN".equals(userRole)) {
+            throw new AccessDeniedException("You don't have permission to delete this resource");
+        }
+
+        // Mark as deleted
+        resource.setDeletedAt(LocalDateTime.now());
+        resource.setModifiedAt(LocalDateTime.now());
+
+        return resourceRepository.save(resource);
+    }
+
+
     public Resource uploadProfilePicture(MultipartFile file, UUID userId) throws IOException {
         // Mark existing profile pictures as deleted
         List<Resource> existingProfilePics = resourceRepository.findByUserIdAndTitleContaining(userId, "Profile Picture");

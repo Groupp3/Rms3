@@ -82,6 +82,8 @@ public class S3Controller {
     }
 
 
+
+
     @PostMapping(value = "/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<UserDTO>> uploadProfilePicture(
             @RequestParam("file") MultipartFile file,
