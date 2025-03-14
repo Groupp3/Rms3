@@ -92,7 +92,7 @@ public class JwtUtil {
         invalidatedTokens.add(token);
 
         // Set the expiration date to a past date (effectively invalidating the token immediately)
-        Claims claims = extractAllClaims(token); // <-- This fails if token signature doesn't match
+        Claims claims = extractAllClaims(token);
         claims.setExpiration(new Date(System.currentTimeMillis() - 1000));  // Set to a time in the past
 
         // Recreate the token with the new expiration date

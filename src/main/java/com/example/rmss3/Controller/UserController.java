@@ -17,15 +17,13 @@ import org.springframework.http.MediaType;
 
 import jakarta.validation.Valid;
 import org.springframework.web.multipart.MultipartFile;
-import java.util.logging.Logger;
-import java.util.logging.Level;
+
 import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
 public class UserController {
-    private static final Logger logger = Logger.getLogger(UserController.class.getName());
 
     @Autowired
     private UserService userService;
@@ -57,6 +55,7 @@ public class UserController {
                     .body(new ApiResponse<>(HttpStatus.UNAUTHORIZED.value(), e.getMessage(), null));
         }
     }
+
     @PostMapping("/auth/logout")
     public ResponseEntity<ApiResponse<String>> logoutUser(@RequestHeader("Authorization") String token) {
         try {
@@ -64,8 +63,8 @@ public class UserController {
             if (token != null && token.startsWith("Bearer ")) {
                 String jwtToken = token.substring(7);
 
-                // No need to validate token before invalidation
-                jwtService.invalidateToken(jwtToken);
+                // Invalidate the token
+                jwtUtil.invalidateToken(jwtToken);
 
                 return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Logout successful", null));
             } else {
@@ -74,13 +73,13 @@ public class UserController {
                         .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Invalid token format", null));
             }
         } catch (Exception e) {
-            // Log the error using the correct method
-            logger.log(Level.WARNING, "Logout error: " + e.getMessage(), e);
-
-            // Still return success - we want the user to be logged out even if there's an error
-            return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Logout processed", null));
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Logout failed: " + e.getMessage(), null));
         }
     }
+
+
 
     // Admin endpoints
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
