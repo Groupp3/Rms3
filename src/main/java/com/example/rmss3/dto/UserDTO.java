@@ -18,4 +18,4 @@ public class UserDTO {
     private String role;
     private UserStatus status;
     private String profileImageUrl;
-}
+    }

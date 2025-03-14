@@ -1,6 +1,5 @@
 package com.example.rmss3.repository;
 
-import com.example.rmss3.dto.UserDTO;
 import com.example.rmss3.entity.User;
 import com.example.rmss3.entity.UserRole;
 import com.example.rmss3.entity.UserStatus;
@@ -16,7 +15,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmail(String email);
     List<User> findByStatusAndRole_RoleAndDeletedAtIsNull(UserStatus status, String role);
     List<User> findByStatusAndDeletedAtIsNull(UserStatus status);
-
-
 
 }

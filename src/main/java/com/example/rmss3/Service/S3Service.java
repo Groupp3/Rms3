@@ -88,6 +88,9 @@ public class S3Service {
         return uploadFile(file, userId, "Profile Picture");
     }
 
+
+
+
     public ResponseEntity<byte[]> getFile(UUID resourceId, UUID userId, String userRole) throws AccessDeniedException {
         Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
@@ -161,7 +164,14 @@ public class S3Service {
         access.setGrantedAt(LocalDateTime.now());
 
         resourceAccessRepository.save(access);
+
     }
+
+
+
+
+
+
 
 
     public void revokeAccess(UUID resourceId, UUID userId, UUID revokerUserId, String revokerRole) throws AccessDeniedException {
