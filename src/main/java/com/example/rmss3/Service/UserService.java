@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface UserService {
-    boolean isAdmin(UUID userId);
+
     ApiResponse registerUser(RegisterDTO registerDTO);
     AuthResponseDTO loginUser(String email, String password);
     List<UserDTO> getAllUsers(UserStatus status, String role);

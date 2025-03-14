@@ -22,9 +22,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class S3Service {
@@ -76,23 +75,6 @@ public class S3Service {
 
         return resourceRepository.save(resource);
     }
-
-    public Resource softDeleteResource(UUID resourceId, UUID userId, String userRole) throws AccessDeniedException {
-        Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
-
-        // Check if user has permission to delete this resource
-        if(!resource.getUserId().equals(userId) && !"ADMIN".equals(userRole)) {
-            throw new AccessDeniedException("You don't have permission to delete this resource");
-        }
-
-        // Mark as deleted
-        resource.setDeletedAt(LocalDateTime.now());
-        resource.setModifiedAt(LocalDateTime.now());
-
-        return resourceRepository.save(resource);
-    }
-
 
     public Resource uploadProfilePicture(MultipartFile file, UUID userId) throws IOException {
         // Mark existing profile pictures as deleted
@@ -251,4 +233,130 @@ public class S3Service {
     }
 
 
+    public Resource uploadFile(MultipartFile file, UUID userId, String title, String visibility, boolean isProfilePicture) throws IOException {
+        String fileName = generateFileName(file);
+        String objectKey;
+
+        // Get file extension to determine folder
+        String extension = getFileExtension(file.getOriginalFilename());
+
+        // Special handling for profile pictures
+        if (isProfilePicture) {
+            objectKey = "profile-pictures/" + userId + "/" + fileName;
+        }
+        // Special handling for certificates (images in learning materials)
+        else if (isImageFile(extension) && title != null && title.startsWith("learning-material")) {
+            objectKey = "certificates/" + fileName;
+        }
+        // Common folders based on extension for all users
+        else {
+            objectKey = extension + "/" + fileName;
+        }
+
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentType(file.getContentType());
+        metadata.setContentLength(file.getSize());
+
+        // Store user ID as metadata for tracking
+        metadata.addUserMetadata("userId", userId.toString());
+
+        s3Client.putObject(bucketName, objectKey, file.getInputStream(), metadata);
+
+        Resource resource = new Resource();
+        resource.setFileSize(file.getSize());
+        resource.setVisibility(visibility != null ? visibility.toLowerCase() : "public");
+        resource.setObjectKey(objectKey);
+        resource.setFilename(file.getOriginalFilename());
+        resource.setTitle(title != null ? title : file.getOriginalFilename());
+        resource.setContentType(file.getContentType());
+        resource.setUserId(userId);
+        resource.setCreatedAt(LocalDateTime.now());
+        resource.setModifiedAt(LocalDateTime.now());
+
+        return resourceRepository.save(resource);
+    }
+    private String getFileExtension(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return "unknown";
+        }
+
+        int lastDotIndex = filename.lastIndexOf('.');
+        if (lastDotIndex > 0 && lastDotIndex < filename.length() - 1) {
+            return filename.substring(lastDotIndex + 1).toLowerCase();
+        } else {
+            return "unknown";
+        }
+    }
+
+    private boolean isImageFile(String extension) {
+        if (extension == null || extension.isEmpty()) {
+            return false;
+        }
+
+        List<String> imageExtensions = Arrays.asList("jpg", "jpeg", "png", "gif", "bmp", "webp", "svg");
+        return imageExtensions.contains(extension.toLowerCase());
+    }
+
+    public List<Resource> findResourcesByRole(UUID userId, String role, String contentType) {
+        // For viewing resources, we don't need to restrict by content type permission
+        // (Different from upload permissions)
+
+        if ("ADMIN".equals(role)) {
+            if (contentType != null && !contentType.isEmpty()) {
+                return resourceRepository.findAllByContentTypeAndDeletedAtIsNull(contentType);
+            } else {
+                return resourceRepository.findByDeletedAtIsNull();
+            }
+        } else if ("MENTOR".equals(role) || "STUDENT".equals(role)) {
+            List<Resource> resources = new ArrayList<>();
+
+            // Add public resources
+            if (contentType != null && !contentType.isEmpty()) {
+                resources.addAll(resourceRepository.findByVisibilityAndContentTypeAndDeletedAtIsNull("public", contentType));
+            } else {
+                resources.addAll(resourceRepository.findByVisibilityAndDeletedAtIsNull("public"));
+            }
+
+            // Add user's own resources
+            if (contentType != null && !contentType.isEmpty()) {
+                resources.addAll(resourceRepository.findByUserIdAndContentTypeAndDeletedAtIsNull(userId, contentType));
+            } else {
+                resources.addAll(resourceRepository.findByUserIdAndDeletedAtIsNull(userId));
+            }
+
+            // Add shared resources
+            List<ResourceAccess> accessList = resourceAccessRepository.findByUserIdAndDeletedAtIsNull(userId);
+            for (ResourceAccess access : accessList) {
+                if (contentType != null && !contentType.isEmpty()) {
+                    resourceRepository.findByIdAndContentTypeAndDeletedAtIsNull(access.getResourceId(), contentType)
+                            .ifPresent(resources::add);
+                } else {
+                    resourceRepository.findByIdAndDeletedAtIsNull(access.getResourceId())
+                            .ifPresent(resources::add);
+                }
+            }
+
+            return resources.stream().distinct().collect(Collectors.toList());
+        } else {
+            return Collections.emptyList();
+        }
+    }
+
+    public Resource softDeleteResource(UUID resourceId, UUID userId, String userRole) throws AccessDeniedException {
+        Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+
+        // Check if user has permission to delete this resource
+        if(!resource.getUserId().equals(userId) && !"ADMIN".equals(userRole)) {
+            throw new AccessDeniedException("You don't have permission to delete this resource");
+        }
+
+        // Mark as deleted
+        resource.setDeletedAt(LocalDateTime.now());
+        resource.setModifiedAt(LocalDateTime.now());
+
+        return resourceRepository.save(resource);
+    }
 }
+
+
