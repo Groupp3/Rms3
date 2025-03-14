@@ -136,6 +136,5 @@ public class Resource {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-
-
 }
+

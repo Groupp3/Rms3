@@ -16,8 +16,16 @@ public class UserDTO {
     private String lastName;
     private String email;
     private String role;
-    private UserStatus status;
-    private String profileImageUrl;
+
+    public UserDTO(UUID id, String firstName, String lastName, String email, String role, UserStatus status, String profileImageUrl) {
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = email;
+        this.role = role;
+        this.status = status;
+        this.profileImageUrl = profileImageUrl;
+    }
 
     public UUID getId() {
         return id;
@@ -43,20 +51,20 @@ public class UserDTO {
         this.lastName = lastName;
     }
 
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
     public String getRole() {
         return role;
     }
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public UserStatus getStatus() {
@@ -75,14 +83,6 @@ public class UserDTO {
         this.profileImageUrl = profileImageUrl;
     }
 
-    public UserDTO(UUID id, String firstName, String lastName, String email, String role, UserStatus status, String profileImageUrl) {
-        this.id = id;
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.email = email;
-        this.role = role;
-        this.status = status; // Add this line to assign the status field
-        this.profileImageUrl = profileImageUrl;
+    private UserStatus status;
+    private String profileImageUrl;
     }
-
-}

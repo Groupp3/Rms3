@@ -45,7 +45,8 @@ public class S3Controller {
         }
 
         try {
-            Resource resource = s3Service.uploadFile(file, userId, null, visibility);
+            // Now using the updated method with all 5 parameters
+            Resource resource = s3Service.uploadFile(file, userId, file.getOriginalFilename(), visibility, false);
             return ResponseEntity
                     .status(HttpStatus.CREATED)
                     .body(new ApiResponse<>(HttpStatus.CREATED.value(), "File uploaded successfully", resource));
@@ -91,7 +92,6 @@ public class S3Controller {
 
         UUID userId = extractUserIdFromToken(token);
 
-
         if (!userService.isUserApproved(userId)) {
             return ResponseEntity
                     .status(HttpStatus.FORBIDDEN)
@@ -99,7 +99,6 @@ public class S3Controller {
         }
 
         try {
-
             if (!file.getContentType().startsWith("image/")) {
                 return ResponseEntity
                         .status(HttpStatus.BAD_REQUEST)
@@ -107,9 +106,8 @@ public class S3Controller {
                                 "Only image files are allowed for profile pictures", null));
             }
 
-
-            Resource resource = s3Service.uploadFile(file, userId);
-
+            // Now using proper profilePicture upload method
+            Resource resource = s3Service.uploadProfilePicture(file, userId);
 
             UserDTO updatedUser = userService.updateProfilePicture(userId, resource.getId());
 

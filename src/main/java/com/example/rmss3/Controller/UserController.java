@@ -17,13 +17,15 @@ import org.springframework.http.MediaType;
 
 import jakarta.validation.Valid;
 import org.springframework.web.multipart.MultipartFile;
-
+import java.util.logging.Logger;
+import java.util.logging.Level;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
 public class UserController {
+    private static final Logger logger = Logger.getLogger(UserController.class.getName());
 
     @Autowired
     private UserService userService;
@@ -55,7 +57,6 @@ public class UserController {
                     .body(new ApiResponse<>(HttpStatus.UNAUTHORIZED.value(), e.getMessage(), null));
         }
     }
-
     @PostMapping("/auth/logout")
     public ResponseEntity<ApiResponse<String>> logoutUser(@RequestHeader("Authorization") String token) {
         try {
@@ -63,8 +64,8 @@ public class UserController {
             if (token != null && token.startsWith("Bearer ")) {
                 String jwtToken = token.substring(7);
 
-                // Invalidate the token
-                jwtUtil.invalidateToken(jwtToken);
+                // No need to validate token before invalidation
+                jwtService.invalidateToken(jwtToken);
 
                 return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Logout successful", null));
             } else {
@@ -73,13 +74,13 @@ public class UserController {
                         .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Invalid token format", null));
             }
         } catch (Exception e) {
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Logout failed: " + e.getMessage(), null));
+            // Log the error using the correct method
+            logger.log(Level.WARNING, "Logout error: " + e.getMessage(), e);
+
+            // Still return success - we want the user to be logged out even if there's an error
+            return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Logout processed", null));
         }
     }
-
-
 
     // Admin endpoints
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
@@ -106,7 +107,15 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "User status updated successfully", updatedUser));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping("/admin/users/{userId}/role")
+    public ResponseEntity<ApiResponse<UserDTO>> updateUserRole(
+            @PathVariable UUID userId,
+            @RequestParam("role") String role) {
 
+        UserDTO updatedUser = userService.updateUserRole(userId, role);
+        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "User role updated successfully", updatedUser));
+    }
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @DeleteMapping("/admin/users/{userId}")
     public ResponseEntity<ApiResponse<UserDTO>> softDeleteUser(

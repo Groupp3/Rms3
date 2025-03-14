@@ -22,16 +22,16 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-        // Create a granted authority from the user's role
+
         SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().getRole());
 
-        // Return a Spring Security UserDetails object with the user information
+
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 user.getPassword(),
                 user.getStatus().name().equals("APPROVED"), // enabled if status is APPROVED
-                true, // accountNonExpired
-                true, // credentialsNonExpired
+                true,
+                true,
                 user.getDeletedAt() == null, // accountNonLocked (locked if deleted)
                 Collections.singleton(authority)
         );
