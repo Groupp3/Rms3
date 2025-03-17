@@ -52,8 +52,7 @@ public class UserController {
         }
     }
 
-
-
+    // Admin endpoints
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @GetMapping("/admin/users")
     public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers(@RequestParam String role) {
@@ -113,7 +112,7 @@ public class UserController {
 
         UUID userId = extractUserIdFromToken(token);
 
-
+        // Verify user is approved
         if (!userService.isUserApproved(userId)) {
             return ResponseEntity
                     .status(HttpStatus.FORBIDDEN)
@@ -121,7 +120,7 @@ public class UserController {
         }
 
         try {
-
+            // Validate file is an image
             if (!file.getContentType().startsWith("image/")) {
                 return ResponseEntity
                         .status(HttpStatus.BAD_REQUEST)
@@ -129,10 +128,10 @@ public class UserController {
                                 "Only image files are allowed for profile pictures", null));
             }
 
-
+            // Upload file as profile picture
             Resource resource = s3Service.uploadProfilePicture(file, userId);
 
-
+            // Update user profile with the resource ID
             UserDTO updatedUser = userService.updateProfilePicture(userId, resource.getId());
 
             return ResponseEntity
@@ -145,7 +144,7 @@ public class UserController {
         }
     }
 
-
+    // Helper method to safely extract user ID from token
     private UUID extractUserIdFromToken(String token) {
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);

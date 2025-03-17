@@ -41,7 +41,13 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private JwtService jwtService;
 
+    @Override
+    public boolean isAdmin(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
+        return user.getRole() != null && user.getRole().getRole().equals("ADMIN");
+    }
 
     @Override
     public ApiResponse registerUser(RegisterDTO registerDTO) {
@@ -56,6 +62,7 @@ public class UserServiceImpl implements UserService {
         user.setFirstName(registerDTO.getFirstName());
         user.setLastName(registerDTO.getLastName());
         user.setEmail(registerDTO.getEmail());
+        user.setPassword(passwordEncoder.encode(registerDTO.getPassword()));
         user.setStatus(UserStatus.PENDING);
         user.setRole(studentRole);
 
@@ -155,6 +162,7 @@ public class UserServiceImpl implements UserService {
         if (updateDTO.getEmail() != null) {
             user.setLastName(updateDTO.getEmail());
         }
+
         // Only update password if provided
 
 

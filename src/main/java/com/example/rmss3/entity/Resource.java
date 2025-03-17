@@ -39,15 +39,6 @@ public class Resource {
     @Column(name = "user_id")
     private UUID userId;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "modified_at")
-    private LocalDateTime modifiedAt;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -136,7 +127,18 @@ public class Resource {
         this.deletedAt = deletedAt;
     }
 
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "modified_at")
+    private LocalDateTime modifiedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+
+
+
 
 
 }
-
