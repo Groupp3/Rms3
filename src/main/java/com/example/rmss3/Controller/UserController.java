@@ -124,6 +124,25 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(),
                 "User deleted successfully", deletedUser));
     }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping("/admin/users/batchDelete")
+    public ResponseEntity<ApiResponse<List<UserDTO>>> batchSoftDeleteUsers(
+            @RequestBody List<UUID> userIds) {
+
+        List<UserDTO> deletedUsers = userService.batchSoftDeleteUsers(userIds);
+
+        if (deletedUsers.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse<>(HttpStatus.NOT_FOUND.value(),
+                            "No users found for deletion", null));
+        }
+
+        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(),
+                "Users deleted successfully", deletedUsers));
+    }
+
+
     // User endpoints
     @GetMapping("/users/profile")
     public ResponseEntity<ApiResponse<UserDTO>> getUserProfile(@RequestHeader("Authorization") String token) {
