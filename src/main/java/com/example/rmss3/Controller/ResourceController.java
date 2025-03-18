@@ -1,3 +1,4 @@
+
 package com.example.rmss3.Controller;
 
 import com.example.rmss3.Service.JwtService;
@@ -18,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -115,6 +117,42 @@ public class ResourceController {
                     .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
         }
     }
+
+
+
+    @PutMapping("/{resourceId}")
+    public ResponseEntity<ApiResponse<Resource>> updateResource(
+            @PathVariable UUID resourceId,
+            @RequestBody Map<String, Object> updates,
+            @RequestHeader("Authorization") String token) {
+
+        try {
+            UUID userId = extractUserIdFromToken(token);
+            String userRole = extractRoleFromToken(token);
+
+            if (!userService.isUserApproved(userId)) {
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+            }
+
+            String title = updates.containsKey("title") ? (String) updates.get("title") : null;
+            Boolean isPublic = updates.containsKey("isPublic") ? (Boolean) updates.get("isPublic") : null;
+
+            Resource updatedResource = s3Service.updateResourceDetails(resourceId, userId, userRole, title, isPublic);
+            return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resource updated successfully", updatedResource));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
+        }
+    }
+
+
 
     @PostMapping("/{resourceId}/share")
     public ResponseEntity<ApiResponse<Void>> shareResource(
@@ -259,3 +297,19 @@ public class ResourceController {
         return jwtService.extractRole(token);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
