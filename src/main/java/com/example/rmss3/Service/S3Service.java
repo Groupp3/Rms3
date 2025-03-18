@@ -93,6 +93,40 @@ public class S3Service {
         return uploadFile(file, userId, "Profile Picture");
     }
 
+
+    public Resource updateResourceDetails(UUID resourceId, UUID userId, String userRole,
+                                          String title, Boolean isPublic) throws AccessDeniedException {
+        Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+
+        // Check if user has permission to update this resource
+        if (!resource.getUserId().equals(userId) && !"ADMIN".equals(userRole)) {
+            throw new AccessDeniedException("You don't have permission to update this resource");
+        }
+
+        // Update fields if provided
+        if (title != null && !title.isEmpty()) {
+            resource.setTitle(title);
+        }
+
+        if (isPublic != null) {
+            resource.setIsPublic(isPublic);
+        }
+
+        resource.setModifiedAt(LocalDateTime.now());
+
+        // Save the updated resource
+        return resourceRepository.save(resource);
+    }
+
+
+
+
+
+
+
+
+
     public ResponseEntity<byte[]> getFile(UUID resourceId, UUID userId, String userRole) throws AccessDeniedException {
         Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
