@@ -24,7 +24,9 @@ public class Resource {
     @Column(name = "file_size")
     private Long fileSize;
 
-    private String visibility;
+    // Changed from String to boolean
+    @Column(name = "is_public")
+    private Boolean isPublic;
 
     @Column(name = "object_key")
     private String objectKey;
@@ -35,17 +37,6 @@ public class Resource {
 
     @Column(name = "content_type")
     private String contentType;
-
-    @Column(name = "user_id")
-    private UUID userId;
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 
     public UUID getId() {
         return id;
@@ -61,14 +52,6 @@ public class Resource {
 
     public void setFileSize(Long fileSize) {
         this.fileSize = fileSize;
-    }
-
-    public String getVisibility() {
-        return visibility;
-    }
-
-    public void setVisibility(String visibility) {
-        this.visibility = visibility;
     }
 
     public String getObjectKey() {
@@ -111,6 +94,14 @@ public class Resource {
         this.userId = userId;
     }
 
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public LocalDateTime getModifiedAt() {
         return modifiedAt;
     }
@@ -127,6 +118,9 @@ public class Resource {
         this.deletedAt = deletedAt;
     }
 
+    @Column(name = "user_id")
+    private UUID userId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -136,5 +130,15 @@ public class Resource {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-}
+    // Update the getter and setter for the new field
+    public Boolean getIsPublic() {
+        return isPublic;
+    }
 
+    public void setIsPublic(Boolean isPublic) {
+        this.isPublic = isPublic;
+    }
+
+    // Keep other getters and setters as they are
+    // ...
+}

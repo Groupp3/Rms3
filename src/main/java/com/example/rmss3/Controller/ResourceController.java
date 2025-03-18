@@ -30,22 +30,18 @@ public class ResourceController {
     @Autowired
     private JwtService jwtService;
 
-
     @Autowired
     private UserService userService;
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Resource>> uploadResource(
-
             @RequestParam("file") MultipartFile file,
-            @RequestParam("visibility") String visibility,
+            @RequestParam("isPublic") Boolean isPublic, // Changed from visibility String to isPublic Boolean
             @RequestHeader("Authorization") String token) {
 
         try {
-
             UUID userId = extractUserIdFromToken(token);
             String userRole = extractRoleFromToken(token.substring(7));
-
 
             if (!userService.isUserApproved(userId)) {
                 return ResponseEntity
@@ -53,7 +49,38 @@ public class ResourceController {
                         .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
             }
 
-            Resource resource = s3Service.uploadLearningMaterial(file, userId, userRole, visibility);
+            // Upload the resource with the 'isPublic' value as 'isVisible'
+            Resource resource = s3Service.uploadLearningMaterial(file, userId, userRole, isPublic);
+            return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resource uploaded successfully", resource));
+        } catch (IOException e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
+        }
+    }
+
+    // For backward compatibility, this method will convert the visibility string to boolean
+    @PostMapping(value = "/upload/legacy", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Resource>> uploadResourceLegacy(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("visibility") String visibility,
+            @RequestHeader("Authorization") String token) {
+
+        try {
+            // Convert visibility string to boolean (public = true, private = false)
+            Boolean isPublic = visibility == null || "public".equalsIgnoreCase(visibility);
+
+            UUID userId = extractUserIdFromToken(token);
+            String userRole = extractRoleFromToken(token.substring(7));
+
+            if (!userService.isUserApproved(userId)) {
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+            }
+
+            // Upload the resource with the 'isPublic' value as 'isVisible'
+            Resource resource = s3Service.uploadLearningMaterial(file, userId, userRole, isPublic);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resource uploaded successfully", resource));
         } catch (IOException e) {
             return ResponseEntity
@@ -70,7 +97,6 @@ public class ResourceController {
         try {
             UUID userId = extractUserIdFromToken(token);
             String userRole = jwtService.extractRole(token.substring(7));
-
 
             if (!userService.isUserApproved(userId)) {
                 return ResponseEntity
@@ -100,7 +126,6 @@ public class ResourceController {
             UUID grantorId = extractUserIdFromToken(token);
             String grantorRole = jwtService.extractRole(token.substring(7));
 
-
             if (!userService.isUserApproved(grantorId)) {
                 return ResponseEntity
                         .status(HttpStatus.FORBIDDEN)
@@ -125,18 +150,15 @@ public class ResourceController {
             @RequestParam(required = false) String contentType,
             @RequestHeader("Authorization") String token)
     {
-
         try {
             UUID userId = extractUserIdFromToken(token);
             String userRole = extractRoleFromToken(token.substring(7));
-
 
             if (!userService.isUserApproved(userId)) {
                 return ResponseEntity
                         .status(HttpStatus.FORBIDDEN)
                         .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
             }
-
 
             List<Resource> resources = s3Service.findResourcesByRole(userId, userRole, contentType);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resources retrieved successfully", resources));
@@ -146,7 +168,6 @@ public class ResourceController {
                     .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
         }
     }
-
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @GetMapping("/admin/all")
@@ -173,7 +194,6 @@ public class ResourceController {
         UUID userId = extractUserIdFromToken(token);
         String userRole = jwtService.extractRole(token.substring(7));
 
-
         if (!userService.isUserApproved(userId)) {
             return ResponseEntity
                     .status(HttpStatus.FORBIDDEN)
@@ -196,7 +216,6 @@ public class ResourceController {
         }
     }
 
-
     @PostMapping("/{resourceId}/revoke")
     public ResponseEntity<ApiResponse<Void>> revokeAccess(
             @PathVariable UUID resourceId,
@@ -206,7 +225,6 @@ public class ResourceController {
         try {
             UUID revokerUserId = extractUserIdFromToken(token);
             String revokerRole = jwtService.extractRole(token.substring(7));
-
 
             if (!userService.isUserApproved(revokerUserId)) {
                 return ResponseEntity
@@ -226,7 +244,6 @@ public class ResourceController {
                     .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
         }
     }
-
 
     private UUID extractUserIdFromToken(String token) {
         if (token != null && token.startsWith("Bearer ")) {
