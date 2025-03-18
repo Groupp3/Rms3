@@ -45,12 +45,12 @@ public class S3Service {
     }
 
     public Resource uploadFile(MultipartFile file, UUID userId, String title) throws IOException {
-        return uploadFile(file, userId, title, "public");
+        // Default to public (true)
+        return uploadFile(file, userId, title, true);
     }
 
-
-
-    public Resource uploadFile(MultipartFile file, UUID userId, String title, String visibility) throws IOException {
+    // Modified method to accept boolean instead of String
+    public Resource uploadFile(MultipartFile file, UUID userId, String title, Boolean isPublic) throws IOException {
         String fileName = generateFileName(file);
         String objectKey = userId + "/" + fileName;
 
@@ -64,7 +64,7 @@ public class S3Service {
         // Create and save resource record
         Resource resource = new Resource();
         resource.setFileSize(file.getSize());
-        resource.setVisibility(visibility != null ? visibility.toLowerCase() : "public");
+        resource.setIsPublic(isPublic != null ? isPublic : true); // Default to public if null
         resource.setObjectKey(objectKey);
         resource.setFilename(file.getOriginalFilename());
         resource.setTitle(title != null ? title : file.getOriginalFilename());
@@ -76,6 +76,12 @@ public class S3Service {
         return resourceRepository.save(resource);
     }
 
+    // For backwards compatibility - converts String to Boolean
+    public Resource uploadFile(MultipartFile file, UUID userId, String title, String visibility) throws IOException {
+        Boolean isPublic = visibility == null || "public".equalsIgnoreCase(visibility);
+        return uploadFile(file, userId, title, isPublic);
+    }
+
     public Resource uploadProfilePicture(MultipartFile file, UUID userId) throws IOException {
         // Mark existing profile pictures as deleted
         List<Resource> existingProfilePics = resourceRepository.findByUserIdAndTitleContaining(userId, "Profile Picture");
@@ -83,7 +89,6 @@ public class S3Service {
             oldPic.setDeletedAt(LocalDateTime.now());
             resourceRepository.save(oldPic);
         }
-
 
         return uploadFile(file, userId, "Profile Picture");
     }
@@ -132,7 +137,8 @@ public class S3Service {
             return true;
         }
 
-        if("public".equals(resource.getVisibility())){
+        // Changed from checking String to Boolean
+        if(resource.getIsPublic() != null && resource.getIsPublic()){
             return true;
         }
 
@@ -142,10 +148,7 @@ public class S3Service {
 
         return resourceAccessRepository.findByResourceIdAndUserIdAndDeletedAtIsNull(
                 resource.getId(),userId).isPresent();
-
-
     }
-
 
     public void grantAccess(UUID resourceId, UUID granteeId, UUID grantorId,String grantorRole) throws AccessDeniedException {
         Resource resource= resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
@@ -163,11 +166,9 @@ public class S3Service {
         resourceAccessRepository.save(access);
     }
 
-
     public void revokeAccess(UUID resourceId, UUID userId, UUID revokerUserId, String revokerRole) throws AccessDeniedException {
         Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
-
 
         if (!resource.getUserId().equals(revokerUserId) && !"ADMIN".equals(revokerRole)) {
             throw new AccessDeniedException("You don't have permission to revoke access");
@@ -181,20 +182,17 @@ public class S3Service {
         resourceAccessRepository.save(access);
     }
 
-
     public List<Resource> findAccessibleResources(UUID userId, String userRole) {
         List<Resource> resources = new ArrayList<>();
 
-
-        resources.addAll(resourceRepository.findByVisibilityAndDeletedAtIsNull("public"));
-
+        // Changed to use isPublic field instead of visibility
+        resources.addAll(resourceRepository.findByIsPublicTrueAndDeletedAtIsNull());
 
         if ("ADMIN".equals(userRole)) {
             return resourceRepository.findByDeletedAtIsNull();
         }
 
         resources.addAll(resourceRepository.findByUserIdAndDeletedAtIsNull(userId));
-
 
         List<ResourceAccess> accessList = resourceAccessRepository
                 .findByUserIdAndDeletedAtIsNull(userId);
@@ -207,33 +205,37 @@ public class S3Service {
         return resources;
     }
 
-
     public boolean isResourceTypeAllowed(String contentType, String userRole) {
         boolean isPDF = contentType.equals("application/pdf");
         boolean isVideo = contentType.startsWith("video/");
         boolean isCertificate = contentType.startsWith("image/");
 
         if ("STUDENT".equals(userRole)) {
-
             return isCertificate;
         }
-
 
         return true;
     }
 
-
+    // Modified to accept boolean instead of String
     public Resource uploadLearningMaterial(MultipartFile file, UUID userId, String userRole,
-                                           String visibility) throws IOException {
+                                           Boolean isPublic) throws IOException {
         if (!isResourceTypeAllowed(file.getContentType(), userRole)) {
             throw new AccessDeniedException("You don't have permission to upload this file type");
         }
 
-        return uploadFile(file, userId, null, visibility); // Pass the visibility parameter
+        return uploadFile(file, userId, null, isPublic);
     }
 
+    // For backwards compatibility
+    public Resource uploadLearningMaterial(MultipartFile file, UUID userId, String userRole,
+                                           String visibility) throws IOException {
+        Boolean isPublic = visibility == null || "public".equalsIgnoreCase(visibility);
+        return uploadLearningMaterial(file, userId, userRole, isPublic);
+    }
 
-    public Resource uploadFile(MultipartFile file, UUID userId, String title, String visibility, boolean isProfilePicture) throws IOException {
+    // Modified with boolean isPublic parameter
+    public Resource uploadFile(MultipartFile file, UUID userId, String title, Boolean isPublic, boolean isProfilePicture) throws IOException {
         String fileName = generateFileName(file);
         String objectKey;
 
@@ -264,7 +266,7 @@ public class S3Service {
 
         Resource resource = new Resource();
         resource.setFileSize(file.getSize());
-        resource.setVisibility(visibility != null ? visibility.toLowerCase() : "public");
+        resource.setIsPublic(isPublic != null ? isPublic : true); // Default to public if null
         resource.setObjectKey(objectKey);
         resource.setFilename(file.getOriginalFilename());
         resource.setTitle(title != null ? title : file.getOriginalFilename());
@@ -275,6 +277,13 @@ public class S3Service {
 
         return resourceRepository.save(resource);
     }
+
+    // For backwards compatibility
+    public Resource uploadFile(MultipartFile file, UUID userId, String title, String visibility, boolean isProfilePicture) throws IOException {
+        Boolean isPublic = visibility == null || "public".equalsIgnoreCase(visibility);
+        return uploadFile(file, userId, title, isPublic, isProfilePicture);
+    }
+
     private String getFileExtension(String filename) {
         if (filename == null || filename.isEmpty()) {
             return "unknown";
@@ -310,11 +319,11 @@ public class S3Service {
         } else if ("MENTOR".equals(role) || "STUDENT".equals(role)) {
             List<Resource> resources = new ArrayList<>();
 
-            // Add public resources
+            // Add public resources - modified to use isPublic field
             if (contentType != null && !contentType.isEmpty()) {
-                resources.addAll(resourceRepository.findByVisibilityAndContentTypeAndDeletedAtIsNull("public", contentType));
+                resources.addAll(resourceRepository.findByIsPublicTrueAndContentTypeAndDeletedAtIsNull(contentType));
             } else {
-                resources.addAll(resourceRepository.findByVisibilityAndDeletedAtIsNull("public"));
+                resources.addAll(resourceRepository.findByIsPublicTrueAndDeletedAtIsNull());
             }
 
             // Add user's own resources
@@ -358,5 +367,3 @@ public class S3Service {
         return resourceRepository.save(resource);
     }
 }
-
-
