@@ -14,11 +14,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+// Add this near the top of your class definition
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -41,16 +42,18 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private JwtService jwtService;
 
-    @Override
-    public boolean isAdmin(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return user.getRole() != null && user.getRole().getRole().equals("ADMIN");
-    }
+    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
     @Override
     public ApiResponse registerUser(RegisterDTO registerDTO) {
+        // Password validation regex (e.g., minimum 8 characters, at least one number, one uppercase letter, and one special character)
+        String passwordRegex = "^(?=.*[0-9])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\\S+$).{8,}$";
+
+        // Check if password meets criteria
+        if (!registerDTO.getPassword().matches(passwordRegex)) {
+            throw new RuntimeException("Password must be at least 8 characters long, contain one uppercase letter, one number, and one special character.");
+        }
+
         if (userRepository.findByEmail(registerDTO.getEmail()).isPresent()) {
             throw new RuntimeException("Email already registered");
         }
@@ -62,7 +65,7 @@ public class UserServiceImpl implements UserService {
         user.setFirstName(registerDTO.getFirstName());
         user.setLastName(registerDTO.getLastName());
         user.setEmail(registerDTO.getEmail());
-        user.setPassword(passwordEncoder.encode(registerDTO.getPassword()));
+        user.setPassword(passwordEncoder.encode(registerDTO.getPassword()));  // Encode password after validation
         user.setStatus(UserStatus.PENDING);
         user.setRole(studentRole);
 
@@ -98,6 +101,75 @@ public class UserServiceImpl implements UserService {
 
         return new AuthResponseDTO(token, convertToDTO(user, profileImageUrl));
     }
+
+
+
+    @Override
+    public UserDTO softDeleteUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+        // Set the deleted timestamp
+        user.setDeletedAt(LocalDateTime.now());
+
+        // Optionally update the status to indicate deletion
+        user.setStatus(UserStatus.REJECTED);
+
+        // Set the modification timestamp
+        user.setModifiedAt(LocalDateTime.now());
+
+        // Save the updated user
+        User deletedUser = userRepository.save(user);
+
+        // Get profile image URL if exists
+        Optional<Resource> profilePic = resourceRepository.findByUserIdAndDeletedAtIsNull(userId)
+                .stream()
+                .findFirst();
+        String profileImageUrl = profilePic.map(resource -> s3Service.getFileUrl(resource.getId())).orElse(null);
+
+        // Convert to DTO and return
+        return convertToDTO(deletedUser, profileImageUrl);
+    }
+
+    @Override
+    public List<UserDTO> batchSoftDeleteUsers(List<UUID> userIds) {
+        List<UserDTO> deletedUsers = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (UUID userId : userIds) {
+            try {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+                // Set the deleted timestamp
+                user.setDeletedAt(now);
+
+                // Update the status to indicate deletion
+                user.setStatus(UserStatus.REJECTED);
+
+                // Set the modification timestamp
+                user.setModifiedAt(now);
+
+                // Save the updated user
+                User deletedUser = userRepository.save(user);
+
+                // Get profile image URL if exists
+                Optional<Resource> profilePic = resourceRepository.findByUserIdAndDeletedAtIsNull(userId)
+                        .stream()
+                        .findFirst();
+                String profileImageUrl = profilePic.map(resource -> s3Service.getFileUrl(resource.getId())).orElse(null);
+
+                // Convert to DTO and add to list
+                deletedUsers.add(convertToDTO(deletedUser, profileImageUrl));
+            } catch (ResourceNotFoundException e) {
+                // Log the error but continue with other users
+                log.error("Error deleting user: {}", e.getMessage());
+            }
+        }
+
+        return deletedUsers;
+    }
+
 
     @Override
     public List<UserDTO> getAllUsers(UserStatus status, String role) {
@@ -162,7 +234,6 @@ public class UserServiceImpl implements UserService {
         if (updateDTO.getEmail() != null) {
             user.setLastName(updateDTO.getEmail());
         }
-
         // Only update password if provided
 
 

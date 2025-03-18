@@ -28,9 +28,6 @@ public class ResourceAccess {
         this.grantedAt = grantedAt;
     }
 
-    private LocalDateTime grantedAt;
-    private LocalDateTime deletedAt;
-
     public UUID getId() {
         return id;
     }
@@ -63,7 +60,8 @@ public class ResourceAccess {
         this.deletedAt = deletedAt;
     }
 
-
+    private LocalDateTime grantedAt;
+    private LocalDateTime deletedAt;
 
 
 }

@@ -12,7 +12,6 @@ import java.util.UUID;
 
 @Repository
 public interface ResourceRepository extends JpaRepository<Resource, UUID> {
-    List<Resource> findByUserId(UUID userId);
     List<Resource> findByUserIdAndDeletedAtIsNull(UUID userId);
     Optional<Resource> findByIdAndUserIdAndDeletedAtIsNull(UUID id, UUID userId);
     Optional<Resource> findByIdAndDeletedAtIsNull(UUID id);

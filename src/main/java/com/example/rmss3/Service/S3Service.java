@@ -64,7 +64,7 @@ public class S3Service {
         // Create and save resource record
         Resource resource = new Resource();
         resource.setFileSize(file.getSize());
-        resource.setVisibility(visibility != null ? visibility.toLowerCase() : "public");
+        resource.setVisibility(visibility != null ? visibility.trim().toUpperCase() : "PUBLIC");
         resource.setObjectKey(objectKey);
         resource.setFilename(file.getOriginalFilename());
         resource.setTitle(title != null ? title : file.getOriginalFilename());
@@ -87,9 +87,6 @@ public class S3Service {
 
         return uploadFile(file, userId, "Profile Picture");
     }
-
-
-
 
     public ResponseEntity<byte[]> getFile(UUID resourceId, UUID userId, String userRole) throws AccessDeniedException {
         Resource resource = resourceRepository.findByIdAndDeletedAtIsNull(resourceId)
@@ -164,14 +161,7 @@ public class S3Service {
         access.setGrantedAt(LocalDateTime.now());
 
         resourceAccessRepository.save(access);
-
     }
-
-
-
-
-
-
 
 
     public void revokeAccess(UUID resourceId, UUID userId, UUID revokerUserId, String revokerRole) throws AccessDeniedException {
@@ -307,6 +297,9 @@ public class S3Service {
         return imageExtensions.contains(extension.toLowerCase());
     }
 
+
+
+
     public List<Resource> findResourcesByRole(UUID userId, String role, String contentType) {
         // For viewing resources, we don't need to restrict by content type permission
         // (Different from upload permissions)
@@ -368,5 +361,3 @@ public class S3Service {
         return resourceRepository.save(resource);
     }
 }
-
-

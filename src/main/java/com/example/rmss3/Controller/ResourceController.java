@@ -30,11 +30,13 @@ public class ResourceController {
     @Autowired
     private JwtService jwtService;
 
+
     @Autowired
     private UserService userService;
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Resource>> uploadResource(
+
             @RequestParam("file") MultipartFile file,
             @RequestParam("visibility") String visibility,
             @RequestHeader("Authorization") String token) {
@@ -46,17 +48,20 @@ public class ResourceController {
 
 
             if (!userService.isUserApproved(userId)) {
-                return ResponseEntity
-                        .status(HttpStatus.FORBIDDEN)
-                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+                throw new AccessDeniedException("User not approved");
             }
+
 
             Resource resource = s3Service.uploadLearningMaterial(file, userId, userRole, visibility);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resource uploaded successfully", resource));
         } catch (IOException e) {
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "File upload error: " + e.getMessage(), null));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Unexpected error: " + e.getMessage(), null));
         }
     }
 
@@ -69,12 +74,11 @@ public class ResourceController {
             UUID userId = extractUserIdFromToken(token);
             String userRole = jwtService.extractRole(token.substring(7));
 
-            // Verify user is approved
+
             if (!userService.isUserApproved(userId)) {
-                return ResponseEntity
-                        .status(HttpStatus.FORBIDDEN)
-                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+                throw new AccessDeniedException("User not approved");
             }
+
 
             return s3Service.getFile(resourceId, userId, userRole);
         } catch (AccessDeniedException e) {
@@ -100,10 +104,9 @@ public class ResourceController {
 
 
             if (!userService.isUserApproved(grantorId)) {
-                return ResponseEntity
-                        .status(HttpStatus.FORBIDDEN)
-                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+                throw new AccessDeniedException("User not approved");
             }
+
 
             s3Service.grantAccess(resourceId, granteeId, grantorId, grantorRole);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resource shared successfully", null));
@@ -120,20 +123,22 @@ public class ResourceController {
 
     @GetMapping("/list")
     public ResponseEntity<ApiResponse<List<Resource>>> listAccessibleResources(
-            @RequestHeader("Authorization") String token) {
+            @RequestParam(required = false) String contentType,
+            @RequestHeader("Authorization") String token)
+    {
 
         try {
             UUID userId = extractUserIdFromToken(token);
-            String userRole = jwtService.extractRole(token.substring(7));
+            String userRole = extractRoleFromToken(token.substring(7));
 
 
             if (!userService.isUserApproved(userId)) {
-                return ResponseEntity
-                        .status(HttpStatus.FORBIDDEN)
-                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+                throw new AccessDeniedException("User not approved");
             }
 
-            List<Resource> resources = s3Service.findAccessibleResources(userId, userRole);
+
+
+            List<Resource> resources = s3Service.findResourcesByRole(userId, userRole, contentType);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resources retrieved successfully", resources));
         } catch (Exception e) {
             return ResponseEntity
@@ -168,7 +173,7 @@ public class ResourceController {
         UUID userId = extractUserIdFromToken(token);
         String userRole = jwtService.extractRole(token.substring(7));
 
-        // Verify user is approved
+
         if (!userService.isUserApproved(userId)) {
             return ResponseEntity
                     .status(HttpStatus.FORBIDDEN)
@@ -192,6 +197,7 @@ public class ResourceController {
     }
 
 
+
     @PostMapping("/{resourceId}/revoke")
     public ResponseEntity<ApiResponse<Void>> revokeAccess(
             @PathVariable UUID resourceId,
@@ -204,10 +210,9 @@ public class ResourceController {
 
 
             if (!userService.isUserApproved(revokerUserId)) {
-                return ResponseEntity
-                        .status(HttpStatus.FORBIDDEN)
-                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
+                throw new AccessDeniedException("User not approved");
             }
+
 
             s3Service.revokeAccess(resourceId, targetUserId, revokerUserId, revokerRole);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Access revoked successfully", null));

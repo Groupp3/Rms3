@@ -20,7 +20,7 @@ import java.io.IOException;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Autowired
-    private JwtService jwtService;
+    private JwtUtil jwtUtil; // Changed from JwtService to match your util class
 
     @Autowired
     private UserDetailsService userDetailsService;
@@ -38,13 +38,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
             jwt = authorizationHeader.substring(7);
-            email = jwtService.extractEmail(jwt);
+
+            // Check if token is blacklisted before proceeding
+            if (jwtUtil.isTokenBlacklisted(jwt)) {
+                chain.doFilter(request, response);
+                return;
+            }
+
+            email = jwtUtil.extractEmail(jwt);
         }
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-            if (jwtService.isTokenValid(jwt, userDetails.getUsername())) {
+            if (jwtUtil.validateToken(jwt, userDetails)) {
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
