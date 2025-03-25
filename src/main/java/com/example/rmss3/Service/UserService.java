@@ -18,6 +18,5 @@ public interface UserService {
     UserDTO updateUserStatus(UUID userId, UserStatus status);
     UserDTO updateUserRole(UUID userId, String role);
     UserDTO updateProfilePicture(UUID userId, UUID resourceId);
-    UserDTO softDeleteUser(UUID userId);
     List<UserDTO> batchSoftDeleteUsers(List<UUID> userIds);
 }

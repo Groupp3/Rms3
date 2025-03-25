@@ -1,19 +1,41 @@
 package com.example.rmss3.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.*;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)  // Excludes null fields in JSON response
 public class ApiResponse<T> {
-    private int statusCode;  // HTTP status code (e.g., 200, 404)
-    private String message;  // Response message (e.g., "Success", "Error")
-    private T data;          // Actual response payload
+    private int statusCode;
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
+    }
+
+    public T getResponse() {
+        return response;
+    }
+
+    public void setResponse(T response) {
+        this.response = response;
+    }
+
+    private String message;
+    private T response;
 
 
 }

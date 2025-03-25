@@ -30,13 +30,11 @@ public class ResourceController {
     @Autowired
     private JwtService jwtService;
 
-
     @Autowired
     private UserService userService;
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Resource>> uploadResource(
-
             @RequestParam("file") MultipartFile file,
             @RequestParam("visibility") String visibility,
             @RequestHeader("Authorization") String token) {
@@ -48,20 +46,17 @@ public class ResourceController {
 
 
             if (!userService.isUserApproved(userId)) {
-                throw new AccessDeniedException("User not approved");
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
             }
-
 
             Resource resource = s3Service.uploadLearningMaterial(file, userId, userRole, visibility);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resource uploaded successfully", resource));
         } catch (IOException e) {
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "File upload error: " + e.getMessage(), null));
-        } catch (Exception e) {
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Unexpected error: " + e.getMessage(), null));
+                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
         }
     }
 
@@ -76,9 +71,10 @@ public class ResourceController {
 
 
             if (!userService.isUserApproved(userId)) {
-                throw new AccessDeniedException("User not approved");
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
             }
-
 
             return s3Service.getFile(resourceId, userId, userRole);
         } catch (AccessDeniedException e) {
@@ -104,9 +100,10 @@ public class ResourceController {
 
 
             if (!userService.isUserApproved(grantorId)) {
-                throw new AccessDeniedException("User not approved");
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
             }
-
 
             s3Service.grantAccess(resourceId, granteeId, grantorId, grantorRole);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Resource shared successfully", null));
@@ -133,9 +130,10 @@ public class ResourceController {
 
 
             if (!userService.isUserApproved(userId)) {
-                throw new AccessDeniedException("User not approved");
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
             }
-
 
 
             List<Resource> resources = s3Service.findResourcesByRole(userId, userRole, contentType);
@@ -165,38 +163,6 @@ public class ResourceController {
         }
     }
 
-    @DeleteMapping("/{resourceId}")
-    public ResponseEntity<ApiResponse<Resource>> softDeleteResource(
-            @PathVariable UUID resourceId,
-            @RequestHeader("Authorization") String token) {
-
-        UUID userId = extractUserIdFromToken(token);
-        String userRole = jwtService.extractRole(token.substring(7));
-
-
-        if (!userService.isUserApproved(userId)) {
-            return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
-        }
-
-        try {
-            Resource deletedResource = s3Service.softDeleteResource(resourceId, userId, userRole);
-            return ResponseEntity
-                    .status(HttpStatus.OK)
-                    .body(new ApiResponse<>(HttpStatus.OK.value(), "Resource deleted successfully", deletedResource));
-        } catch (AccessDeniedException e) {
-            return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), e.getMessage(), null));
-        } catch (Exception e) {
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null));
-        }
-    }
-
-
 
     @PostMapping("/{resourceId}/revoke")
     public ResponseEntity<ApiResponse<Void>> revokeAccess(
@@ -210,9 +176,10 @@ public class ResourceController {
 
 
             if (!userService.isUserApproved(revokerUserId)) {
-                throw new AccessDeniedException("User not approved");
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN.value(), "User not approved", null));
             }
-
 
             s3Service.revokeAccess(resourceId, targetUserId, revokerUserId, revokerRole);
             return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Access revoked successfully", null));

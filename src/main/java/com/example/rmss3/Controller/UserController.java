@@ -8,7 +8,6 @@ import com.example.rmss3.entity.Resource;
 import com.example.rmss3.entity.UserRole;
 import com.example.rmss3.entity.UserStatus;
 import com.example.rmss3.security.JwtUtil;
-import io.jsonwebtoken.Claims;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +18,6 @@ import org.springframework.http.MediaType;
 import jakarta.validation.Valid;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -59,31 +57,25 @@ public class UserController {
     }
 
     @PostMapping("/auth/logout")
-    public ResponseEntity<ApiResponse<String>> logoutUser(@RequestHeader("Authorization") String token) {
-        try {
-            // Verify token exists and has correct format
-            if (token != null && token.startsWith("Bearer ")) {
-                String jwtToken = token.substring(7);
+    public ResponseEntity<ApiResponse> logout(@RequestHeader("Authorization") String token) {
+        if (token != null && token.startsWith("Bearer ")) {
+            String jwt = token.substring(7);
 
-                // Use the new method that handles invalid tokens
-                jwtUtil.blacklistRawToken(jwtToken);
 
-                return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Logout successful", null));
-            } else {
-                return ResponseEntity
-                        .status(HttpStatus.BAD_REQUEST)
-                        .body(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Invalid token format", null));
-            }
-        } catch (Exception e) {
-            // Log the error but return success anyway
-            System.err.println("Error during logout: " + e.getMessage());
-            return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Logout successful", null));
+            jwtUtil.blacklistToken(jwt);
+
+            ApiResponse response = new ApiResponse(
+                    HttpStatus.OK.value(),
+                    "Logout successful",
+                    null
+            );
+            return ResponseEntity.ok(response);
         }
+
+        throw new RuntimeException("Invalid token");
     }
 
 
-
-    // Admin endpoints
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @GetMapping("/admin/users")
     public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers(@RequestParam String role) {
@@ -117,33 +109,6 @@ public class UserController {
         UserDTO updatedUser = userService.updateUserRole(userId, role);
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "User role updated successfully", updatedUser));
     }
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @DeleteMapping("/admin/users/{userId}")
-    public ResponseEntity<ApiResponse<UserDTO>> softDeleteUser(
-            @PathVariable UUID userId) {
-
-        UserDTO deletedUser = userService.softDeleteUser(userId);
-        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(),
-                "User deleted successfully", deletedUser));
-    }
-
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @DeleteMapping("/admin/users/batchDelete")
-    public ResponseEntity<ApiResponse<List<UserDTO>>> batchSoftDeleteUsers(
-            @RequestBody List<UUID> userIds) {  // Accepting a List of UUIDs in the body
-
-        List<UserDTO> deletedUsers = userService.batchSoftDeleteUsers(userIds);
-
-        if (deletedUsers.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new ApiResponse<>(HttpStatus.NOT_FOUND.value(),
-                            "No users found for deletion", null));
-        }
-
-        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(),
-                "Users deleted successfully", deletedUsers));
-    }
-
 
     // User endpoints
     @GetMapping("/users/profile")
@@ -163,7 +128,6 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(), "Profile updated successfully", updatedUser));
     }
 
-
     @PostMapping(value = "/users/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<UserDTO>> uploadProfilePicture(
             @RequestParam("file") MultipartFile file,
@@ -171,7 +135,7 @@ public class UserController {
 
         UUID userId = extractUserIdFromToken(token);
 
-        // Verify user is approved
+
         if (!userService.isUserApproved(userId)) {
             return ResponseEntity
                     .status(HttpStatus.FORBIDDEN)
@@ -179,7 +143,7 @@ public class UserController {
         }
 
         try {
-            // Validate file is an image
+
             if (!file.getContentType().startsWith("image/")) {
                 return ResponseEntity
                         .status(HttpStatus.BAD_REQUEST)
@@ -187,10 +151,10 @@ public class UserController {
                                 "Only image files are allowed for profile pictures", null));
             }
 
-            // Upload file as profile picture
+
             Resource resource = s3Service.uploadProfilePicture(file, userId);
 
-            // Update user profile with the resource ID
+
             UserDTO updatedUser = userService.updateProfilePicture(userId, resource.getId());
 
             return ResponseEntity
@@ -203,11 +167,28 @@ public class UserController {
         }
     }
 
-    // Helper method to safely extract user ID from token
+
     private UUID extractUserIdFromToken(String token) {
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
         return jwtService.extractUserId(token);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping("/admin/users/batchDelete")
+    public ResponseEntity<ApiResponse<List<UserDTO>>> batchSoftDeleteUsers(
+            @RequestBody List<UUID> userIds) {
+
+        List<UserDTO> deletedUsers = userService.batchSoftDeleteUsers(userIds);
+
+        if (deletedUsers.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse<>(HttpStatus.NOT_FOUND.value(),
+                            "No users found for deletion", null));
+        }
+
+        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.value(),
+                "Users deleted successfully", deletedUsers));
     }
 }
